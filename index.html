@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>/r/place</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: monospace; }
+
+  #login-screen {
+    position: fixed; inset: 0;
+    background: #1a1a2e;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .login-box {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: 100%; max-width: 360px;
+    margin: 16px;
+  }
+  .logo { text-align: center; margin-bottom: 32px; }
+  .logo h1 { font-size: 42px; font-weight: 900; color: #fff; letter-spacing: -1px; }
+  .logo h1 span { color: #e94560; }
+  .logo p { color: #666; font-size: 13px; margin-top: 6px; }
+  .pixel-row { display: flex; gap: 3px; justify-content: center; margin-bottom: 16px; }
+  .pixel-dot { width: 12px; height: 12px; border-radius: 2px; }
+  label { display: block; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+  input[type=text] {
+    width: 100%; background: #0f3460; color: #fff;
+    border: 1.5px solid transparent; border-radius: 12px;
+    padding: 14px 16px; font-size: 15px; font-family: monospace;
+    outline: none; transition: border-color .2s;
+  }
+  input[type=text]:focus { border-color: #e94560; }
+  input[type=text]::placeholder { color: #444; }
+  .error { color: #e94560; font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .join-btn {
+    width: 100%; margin-top: 16px;
+    background: #e94560; color: #fff; border: none;
+    border-radius: 12px; padding: 14px; font-size: 14px;
+    font-weight: 700; font-family: monospace; letter-spacing: 1px;
+    cursor: pointer; transition: all .15s;
+  }
+  .join-btn:hover { background: #c73652; }
+  .join-btn:active { transform: scale(.97); }
+  .login-footer { text-align: center; color: #444; font-size: 11px; margin-top: 20px; }
+
+  #app { display: none; flex-direction: column; height: 100vh; }
+  #app.visible { display: flex; }
+
+  header {
+    background: #16213e; border-bottom: 1px solid #0f3460;
+    padding: 10px 16px; display: flex; align-items: center;
+    justify-content: space-between; flex-shrink: 0; z-index: 10;
+  }
+  .header-logo { font-size: 20px; font-weight: 900; color: #fff; }
+  .header-logo span { color: #e94560; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .coord-info { font-size: 11px; color: #555; display: none; }
+  .coord-info.visible { display: block; }
+  .user-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: #0f3460; border-radius: 20px; padding: 5px 12px;
+  }
+  .user-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .user-name { font-size: 12px; color: #fff; font-weight: 600; }
+
+  #canvas-wrap {
+    flex: 1; position: relative; overflow: hidden;
+    cursor: crosshair; background: #111;
+  }
+  canvas { display: block; touch-action: none; }
+
+  .zoom-controls { position: absolute; bottom: 72px; right: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .zoom-btn {
+    width: 36px; height: 36px; background: #16213e;
+    border: 1px solid #0f3460; color: #fff; border-radius: 8px;
+    font-size: 20px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; font-family: monospace;
+  }
+  .zoom-btn:hover { background: #0f3460; }
+  .zoom-btn:active { transform: scale(.92); }
+  .zoom-label {
+    position: absolute; bottom: 12px; left: 12px;
+    font-size: 11px; color: #444; background: rgba(22,33,62,.7);
+    padding: 3px 8px; border-radius: 6px;
+  }
+
+  .toast {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: #16213e; color: #fff; font-size: 12px;
+    padding: 8px 16px; border-radius: 20px; border: 1px solid #0f3460;
+    opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  #palette {
+    flex-shrink: 0; background: #16213e;
+    border-top: 1px solid #0f3460; padding: 10px 12px;
+  }
+  .palette-inner { display: flex; align-items: center; gap: 10px; max-width: 600px; margin: 0 auto; }
+  .selected-color { width: 32px; height: 32px; border-radius: 8px; border: 2px solid #fff; flex-shrink: 0; box-shadow: 0 0 0 2px #e94560; }
+  .colors { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+  .color-btn {
+    width: 26px; height: 26px; border-radius: 5px; cursor: pointer;
+    border: 1.5px solid rgba(255,255,255,.15); transition: all .15s;
+    flex-shrink: 0;
+  }
+  .color-btn:active { transform: scale(.88); }
+  .color-btn.active { border: 2.5px solid #fff; transform: scale(1.18); box-shadow: 0 0 0 1.5px #e94560; }
+
+  /* Online counter badge */
+  .online-badge {
+    display: flex; align-items: center; gap: 5px;
+    background: #0f3460; border-radius: 20px; padding: 5px 10px;
+    cursor: pointer; transition: background .15s; user-select: none;
+  }
+  .online-badge:hover { background: #1a4080; }
+  .online-count { font-size: 12px; color: #4ade80; font-weight: 700; }
+  .online-label { font-size: 11px; color: #666; }
+
+  /* Online users panel */
+  #online-panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 220px; background: #16213e;
+    border-left: 1px solid #0f3460;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    z-index: 20; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #online-panel.open { transform: translateX(0); }
+  .panel-header {
+    padding: 14px 16px; border-bottom: 1px solid #0f3460;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-title { font-size: 12px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1.5px; }
+  .panel-close {
+    width: 24px; height: 24px; background: none; border: none;
+    color: #555; font-size: 16px; cursor: pointer; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .15s;
+  }
+  .panel-close:hover { color: #fff; }
+  #user-list { flex: 1; overflow-y: auto; padding: 8px; }
+  #user-list::-webkit-scrollbar { width: 4px; }
+  #user-list::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+  .user-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: 8px; transition: background .1s;
+  }
+  .user-item:hover { background: #0f3460; }
+  .user-item-dot { width: 7px; height: 7px; background: #4ade80; border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+  .user-item-name { font-size: 12px; color: #ccc; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-item-me { font-size: 10px; color: #e94560; font-weight: 700; }
+  .panel-empty { font-size: 12px; color: #444; text-align: center; padding: 24px 8px; }
+
+  /* Pixel info tooltip */
+  #pixel-tooltip {
+    position: absolute; pointer-events: none;
+    background: #16213e; border: 1px solid #0f3460;
+    border-radius: 10px; padding: 8px 12px;
+    font-size: 11px; color: #ccc; white-space: nowrap;
+    opacity: 0; transition: opacity .15s;
+    z-index: 30; max-width: 200px;
+  }
+  #pixel-tooltip.show { opacity: 1; }
+  .tip-coord { color: #888; font-size: 10px; margin-bottom: 4px; }
+  .tip-color { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .tip-color-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .tip-user { color: #fff; font-weight: 700; }
+  .tip-time { color: #555; font-size: 10px; margin-top: 2px; }
+  .tip-empty { color: #444; font-style: italic; }
+
+  /* Activity feed */
+  #activity-feed {
+    position: absolute; bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 4px;
+    pointer-events: none; z-index: 25; align-items: center;
+  }
+  .activity-item {
+    background: rgba(22,33,62,.92); border: 1px solid #0f3460;
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 11px; color: #aaa;
+    animation: fadeInUp .3s ease, fadeOut .3s ease 2.7s forwards;
+    white-space: nowrap;
+  }
+  .activity-item strong { color: #fff; }
+  .activity-color { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin: 0 2px; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div>
+    <div class="login-box">
+      <div class="logo">
+        <div class="pixel-row" id="pixel-deco"></div>
+        <h1>/r/<span>place</span></h1>
+        <p>Bir piksel, bir an, bir topluluk</p>
+      </div>
+      <label>Kullanıcı Adı</label>
+      <input type="text" id="username-input" placeholder="pixel_artist_42" maxlength="24" autocomplete="off">
+      <div class="error" id="error-msg"></div>
+      <button class="join-btn" onclick="joinCanvas()">Canvas'a Katıl →</button>
+    </div>
+    <div class="login-footer">500×500 piksel · Sınırsız · Gerçek zamanlı</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="header-logo">/r/<span>place</span></div>
+    <div class="header-right">
+      <div class="coord-info" id="coord-info">-,-</div>
+      <div class="online-badge" onclick="toggleOnlinePanel()" title="Online kullanıcıları göster">
+        <div class="user-dot"></div>
+        <span class="online-count" id="online-count">1</span>
+        <span class="online-label">online</span>
+      </div>
+      <div class="user-badge">
+        <div class="user-dot"></div>
+        <div class="user-name" id="header-username"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+
+    <!-- Online users panel -->
+    <div id="online-panel">
+      <div class="panel-header">
+        <span class="panel-title">Online</span>
+        <button class="panel-close" onclick="toggleOnlinePanel()">✕</button>
+      </div>
+      <div id="user-list"></div>
+    </div>
+
+    <!-- Pixel info tooltip -->
+    <div id="pixel-tooltip">
+      <div class="tip-coord" id="tip-coord"></div>
+      <div id="tip-body"></div>
+    </div>
+
+    <!-- Activity feed -->
+    <div id="activity-feed"></div>
+
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomCenter(1)">+</button>
+      <button class="zoom-btn" onclick="zoomCenter(-1)">−</button>
+    </div>
+    <div class="zoom-label" id="zoom-label">100%</div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div id="palette">
+    <div class="palette-inner">
+      <div class="selected-color" id="selected-swatch"></div>
+      <div class="colors" id="color-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://zkpmiscpqpsbgxqpvdkz.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InprcG1pc2NwcXBzYmd4cXB2ZGt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODU0NTYsImV4cCI6MjA5MzY2MTQ1Nn0.QeliyPo6CFSoQFS4WLru3OUJ4rVB8VqirfeB7dx6Fp8'
+const GRID = 500
+const MIN_SCALE = 1, MAX_SCALE = 40
+
+const COLORS = [
+  '#FFFFFF','#E4E4E4','#888888','#222222',
+  '#FFA7D1','#E50000','#E59500','#A06A00',
+  '#E5D900','#94E044','#02BE01','#00D3DD',
+  '#0083C7','#0000EA','#CF6EE4','#820080',
+]
+
+let username = ''
+let selectedColor = '#E50000'
+let pixels = new Map()
+let pixelMeta = new Map()
+let scale = 2
+let ox = 0, oy = 0
+let isDragging = false
+let dragStartX = 0, dragStartY = 0
+let hasDragged = false
+let lastTouchDist = null
+let animFrame = null
+let onlineUsers = new Map()
+let presenceChannel = null
+let panelOpen = false
+
+const canvas = document.getElementById('c')
+const ctx = canvas.getContext('2d')
+const wrap = document.getElementById('canvas-wrap')
+
+const decoColors = ['#e94560','#e59500','#E5D900','#94E044','#02BE01','#00D3DD','#0083C7','#CF6EE4']
+const deco = document.getElementById('pixel-deco')
+decoColors.forEach(c => {
+  const d = document.createElement('div')
+  d.className = 'pixel-dot'
+  d.style.background = c
+  deco.appendChild(d)
+})
+
+const colorGrid = document.getElementById('color-grid')
+COLORS.forEach(c => {
+  const btn = document.createElement('div')
+  btn.className = 'color-btn' + (c === selectedColor ? ' active' : '')
+  btn.style.background = c
+  btn.onclick = () => selectColor(c)
+  colorGrid.appendChild(btn)
+})
+document.getElementById('selected-swatch').style.background = selectedColor
+
+function selectColor(c) {
+  selectedColor = c
+  document.getElementById('selected-swatch').style.background = c
+  document.querySelectorAll('.color-btn').forEach((b, i) => {
+    b.classList.toggle('active', COLORS[i] === c)
+  })
+}
+
+document.getElementById('username-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') joinCanvas()
+})
+
+function joinCanvas() {
+  const val = document.getElementById('username-input').value.trim()
+  const err = document.getElementById('error-msg')
+  if (!val) { err.textContent = 'Kullanıcı adı boş olamaz'; return }
+  if (val.length < 2) { err.textContent = 'En az 2 karakter'; return }
+  if (val.length > 24) { err.textContent = 'En fazla 24 karakter'; return }
+  if (!/^[a-zA-Z0-9_\-]+$/.test(val)) { err.textContent = 'Sadece harf, rakam, _ ve - kullanabilirsin'; return }
+  username = val
+  localStorage.setItem('rplace_username', val)
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').classList.add('visible')
+  document.getElementById('header-username').textContent = username
+  onlineUsers.set(username, { color: selectedColor })
+  updateOnlineUI()
+  initCanvas()
+}
+
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('rplace_username')
+  if (saved) document.getElementById('username-input').value = saved
+})
+
+function initCanvas() {
+  resize()
+  window.addEventListener('resize', resize)
+  loadPixels()
+  subscribeRealtime()
+}
+
+function resize() {
+  canvas.width = wrap.clientWidth
+  canvas.height = wrap.clientHeight
+  ox = canvas.width / 2 - (GRID * scale) / 2
+  oy = canvas.height / 2 - (GRID * scale) / 2
+  draw()
+}
+
+function draw() {
+  cancelAnimationFrame(animFrame)
+  animFrame = requestAnimationFrame(_draw)
+}
+
+function _draw() {
+  const W = canvas.width, H = canvas.height
+  ctx.clearRect(0, 0, W, H)
+
+  const cx0 = Math.max(0, ox),
